@@ -17,6 +17,7 @@ async function run(){
     try{
         await client.connect();
         const serviceCollection = client.db('bhuiyan_tools').collection('service');
+        const orderCollection = client.db('bhuiyan_tools').collection('orders');
 
         //API for all services
         app.get('/purchase', async(req, res) => {
@@ -32,6 +33,22 @@ async function run(){
             const query = {_id: ObjectId(id)};
             const result = await serviceCollection.findOne(query);
             res.send(result);
+        });
+
+
+        //order collection
+        //order now
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            const query = { service: order.service, client: order.client, quantity: order.quantity };
+            const exists = await orderCollection.findOne(query);
+            if (exists) {
+                return res.send({ success: false, order: exists })
+            }
+            else {
+                const result = await orderCollection.insertOne(order);
+                return res.send({ success: true, result });
+            }
         })
 
     }
