@@ -49,7 +49,15 @@ async function run(){
                 const result = await orderCollection.insertOne(order);
                 return res.send({ success: true, result });
             }
-        })
+        });
+
+        //my orders
+        app.get('/order', async(req, res) => {
+            const client = req.query.client;
+            const query = {client: client};
+            const myOrders = await orderCollection.find(query).toArray();
+            res.send(myOrders);
+        });
 
     }
 
