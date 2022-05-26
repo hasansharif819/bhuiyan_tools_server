@@ -18,6 +18,7 @@ async function run(){
         await client.connect();
         const serviceCollection = client.db('bhuiyan_tools').collection('service');
         const orderCollection = client.db('bhuiyan_tools').collection('orders');
+        const reviewCollection = client.db('bhuiyan_tools').collection('reviews');
 
         //API for all services
         app.get('/purchase', async(req, res) => {
@@ -65,6 +66,28 @@ async function run(){
             const query = { _id: ObjectId(id) };
             const result = await orderCollection.deleteOne(query);
             res.send(result);
+        });
+
+        //review post
+        app.post('/review', async (req, res) => {
+            const review = req.body;
+            const query = { review: review.review, client: review.client, clientName: review.clientName, rating: review.rating };
+            const exists = await reviewCollection.findOne(query);
+            if (exists) {
+                return res.send({ success: false, order: exists })
+            }
+            else {
+                const result = await reviewCollection.insertOne(review);
+                return res.send({ success: true, result });
+            }
+        });
+
+        //All reviews
+        app.get('/review', async(req, res) => {
+            const query = {};
+            const cursor = reviewCollection.find(query);
+            const review = await cursor.toArray();
+            res.send(review);
         });
 
     }
