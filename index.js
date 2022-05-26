@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
@@ -17,20 +18,20 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 function verifyJWT(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-      return res.status(401).send({ message: 'UnAuthorized access' });
+        return res.status(401).send({ message: 'UnAuthorized access' });
     }
     const token = authHeader.split(' ')[1];
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
-      if (err) {
-        return res.status(403).send({ message: 'Forbidden access' })
-      }
-      req.decoded = decoded;
-      next();
+        if (err) {
+            return res.status(403).send({ message: 'Forbidden access' })
+        }
+        req.decoded = decoded;
+        next();
     });
-  }
+}
 
-async function run(){
-    try{
+async function run() {
+    try {
         await client.connect();
         const serviceCollection = client.db('bhuiyan_tools').collection('service');
         const orderCollection = client.db('bhuiyan_tools').collection('orders');
@@ -40,7 +41,7 @@ async function run(){
         const userCollection = client.db('bhuiyan_tools').collection('users');
 
         //API for all services
-        app.get('/purchase', async(req, res) => {
+        app.get('/purchase', async (req, res) => {
             const query = {};
             const cursor = serviceCollection.find(query);
             const service = await cursor.toArray();
@@ -48,9 +49,9 @@ async function run(){
         });
 
         //query using id
-        app.get('/purchase/:id', async(req, res) => {
+        app.get('/purchase/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId(id)};
+            const query = { _id: ObjectId(id) };
             const result = await serviceCollection.findOne(query);
             res.send(result);
         });
@@ -72,11 +73,20 @@ async function run(){
         });
 
         //my orders
-        app.get('/order', async(req, res) => {
+        app.get('/order', verifyJWT, async (req, res) => {
             const client = req.query.client;
-            const query = {client: client};
+            // const authorization = req.headers.authorization;
+            // console.log('auth headers', authorization)
+            const decodedEmail = req.decoded.email;
+            if(client === decodedEmail){
+                const query = { client: client };
             const myOrders = await orderCollection.find(query).toArray();
-            res.send(myOrders);
+            return res.send(myOrders);
+            }
+            else{
+                return res.status(403).send({message: 'forbidden access'})
+            }
+            
         });
 
         //delete my order
@@ -102,7 +112,7 @@ async function run(){
         });
 
         //All reviews
-        app.get('/review', async(req, res) => {
+        app.get('/review', async (req, res) => {
             const query = {};
             const cursor = reviewCollection.find(query);
             const review = await cursor.toArray();
@@ -112,7 +122,7 @@ async function run(){
         //user profile 
         app.post('/user', async (req, res) => {
             const profile = req.body;
-            const query = { client: profile.client,clientName: profile.clientName, edu: profile.edu, address: profile.address, age: profile.age, phone: profile.phone, img: profile.img };
+            const query = { client: profile.client, clientName: profile.clientName, edu: profile.edu, address: profile.address, age: profile.age, phone: profile.phone, img: profile.img };
             const exists = await profileCollection.findOne(query);
             if (exists) {
                 return res.send({ success: false, order: exists })
@@ -124,52 +134,58 @@ async function run(){
         });
 
         // API for all userProfile
-        app.get('/user', async(req, res) => {
-            const query = {};
-            const cursor = profileCollection.find(query);
-            const result = await cursor.toArray();
-            res.send(result);
-        });
+        // app.get('/user', verifyJWT, async (req, res) => {
+        //     const query = {};
+        //     const cursor = profileCollection.find(query);
+        //     const result = await cursor.toArray();
+        //     res.send(result);
+        // });
 
         //query using email
-        
+
+        // app.get('/user', async (req, res) => {
+        //     const email = req.query.email;
+        //     const query = { email: email };
+        //     const cursor = profileCollection.find(query);
+        //     const result = await cursor.toArray();
+        //     res.send(cursor);
+        // });
+
+        //get all users
         app.get('/user', async(req, res) => {
-            const email = req.query.email;
-            const query = {email: email};
-            const cursor = profileCollection.find(query);
-            const result = await cursor.toArray();
-            res.send(cursor);
-        });
+            const users = await userCollection.find().toArray();
+            res.send(users)
+        })
 
         //make an admin
-        app.put('/user/:adimin/:email', async(req, res) => {
+        app.put('/user/:adimin/:email', async (req, res) => {
             const email = req.params.email;
 
-            const filter = {email: email};
+            const filter = { email: email };
             const updateDoc = {
-                $set: {role: 'admin'},
-            };
-            const result = await adminCollection.updateOne(filter, updateDoc);
+                $set: { role: 'admin' },
+              };
+            const result = await userCollection.updateOne(filter, updateDoc);
             res.send(result);
         });
 
-        //login user
+        //login user user data colect
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
             const filter = { email: email };
             const options = { upsert: true };
             const updateDoc = {
-              $set: user,
+                $set: user,
             };
             const result = await userCollection.updateOne(filter, updateDoc, options);
             const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
-            res.send({ result, token });
-          })
+            res.send({result, token});
+        })
 
     }
 
-    finally{
+    finally {
 
     }
 
