@@ -13,12 +13,31 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+//jwt 
+function verifyJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).send({ message: 'UnAuthorized access' });
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+      if (err) {
+        return res.status(403).send({ message: 'Forbidden access' })
+      }
+      req.decoded = decoded;
+      next();
+    });
+  }
+
 async function run(){
     try{
         await client.connect();
         const serviceCollection = client.db('bhuiyan_tools').collection('service');
         const orderCollection = client.db('bhuiyan_tools').collection('orders');
         const reviewCollection = client.db('bhuiyan_tools').collection('reviews');
+        const profileCollection = client.db('bhuiyan_tools').collection('userProfile');
+        const adminCollection = client.db('bhuiyan_tools').collection('adminProfile');
+        const userCollection = client.db('bhuiyan_tools').collection('users');
 
         //API for all services
         app.get('/purchase', async(req, res) => {
@@ -89,6 +108,64 @@ async function run(){
             const review = await cursor.toArray();
             res.send(review);
         });
+
+        //user profile 
+        app.post('/user', async (req, res) => {
+            const profile = req.body;
+            const query = { client: profile.client,clientName: profile.clientName, edu: profile.edu, address: profile.address, age: profile.age, phone: profile.phone, img: profile.img };
+            const exists = await profileCollection.findOne(query);
+            if (exists) {
+                return res.send({ success: false, order: exists })
+            }
+            else {
+                const result = await profileCollection.insertOne(profile);
+                return res.send({ success: true, result });
+            }
+        });
+
+        // API for all userProfile
+        app.get('/user', async(req, res) => {
+            const query = {};
+            const cursor = profileCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        });
+
+        //query using email
+        
+        app.get('/user', async(req, res) => {
+            const email = req.query.email;
+            const query = {email: email};
+            const cursor = profileCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(cursor);
+        });
+
+        //make an admin
+        app.put('/user/:adimin/:email', async(req, res) => {
+            const email = req.params.email;
+
+            const filter = {email: email};
+            const updateDoc = {
+                $set: {role: 'admin'},
+            };
+            const result = await adminCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
+        //login user
+        app.put('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = req.body;
+            const filter = { email: email };
+            const options = { upsert: true };
+            const updateDoc = {
+              $set: user,
+            };
+            const result = await userCollection.updateOne(filter, updateDoc, options);
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ result, token });
+          })
 
     }
 
