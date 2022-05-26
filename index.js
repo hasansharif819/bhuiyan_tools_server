@@ -97,6 +97,12 @@ async function run() {
             res.send(result);
         });
 
+        //manage all order
+        app.get('/order', async(req, res) => {
+            const orders = await orderCollection.find().toArray();
+            res.send(orders)
+        })
+
         //review post
         app.post('/review', async (req, res) => {
             const review = req.body;
@@ -158,16 +164,31 @@ async function run() {
         })
 
         //make an admin
-        app.put('/user/:adimin/:email', async (req, res) => {
+        app.put('/user/:adimin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({ email: requester });
 
-            const filter = { email: email };
-            const updateDoc = {
-                $set: { role: 'admin' },
-              };
-            const result = await userCollection.updateOne(filter, updateDoc);
-            res.send(result);
-        });
+            if (requesterAccount.role === 'admin') {
+                const filter = { email: email };
+                const updateDoc = {
+                  $set: { role: 'admin' },
+                };
+                const result = await userCollection.updateOne(filter, updateDoc);
+                res.send(result);
+              }
+              else{
+                res.status(403).send({message: 'forbidden'});
+              }
+        
+            })
+            //checking admin or not
+            app.get('/admin/:email', async(req, res) =>{
+                const email = req.params.email;
+                const user = await userCollection.findOne({email: email});
+                const isAdmin = user.role === 'admin';
+                res.send({admin: isAdmin})
+              })
 
         //login user user data colect
         app.put('/user/:email', async (req, res) => {
