@@ -235,6 +235,21 @@ async function run() {
             res.send(result);
         });
 
+        //all user profile load from db
+        app.get('/profile', async(req, res) => {
+            const profile = await profileCollection.find().toArray();
+            res.send(profile);
+        })
+
+       
+        //update user profile data load from mongo
+        app.get('/profile/:email', async(req, res) => {
+            const email = req.query.client;
+            const query = {email: email};
+            const profile = await profileCollection.findOne(query);
+            res.send(profile);
+        })
+
     }
 
     finally {
